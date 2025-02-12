@@ -10,7 +10,7 @@ clang main.c -o cube -lm
 
 Compile with GCC:
 ```bash
-gcc main.c -o cube -lmd
+gcc main.c -o cube -lm
 ```
 
 Run:
