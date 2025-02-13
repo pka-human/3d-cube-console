@@ -104,7 +104,7 @@ float get_char_aspect_ratio() {
     unsigned height = 5;
     unsigned width = height;
     float aspect_ratio = 1.0;
-    int ch;
+    char ch;
     bool changed = true;
 
 #ifdef _WIN32
@@ -115,7 +115,6 @@ float get_char_aspect_ratio() {
 #else
     struct termios oldt, newt;
     int oldf;
-
     tcgetattr(STDIN_FILENO, &oldt);
     newt = oldt;
     newt.c_lflag &= ~(ICANON | ECHO);
@@ -131,46 +130,36 @@ float get_char_aspect_ratio() {
 
             for (unsigned i = 0; i < height; ++i) {
                 for (unsigned j = 0; j < width; ++j) {
-                    if (i == 0 || i == height - 1 || j == 0 || j == width - 1) {
-                        putchar('@');
-                    } else {
-                        putchar('.');
-                    }
+                    putchar((i == 0 || i == height-1 || j == 0 || j == width-1) ? '@' : '.');
                 }
                 putchar('\n');
             }
-
             changed = false;
         }
 
 #ifdef _WIN32
         if (_kbhit()) {
             ch = _getch();
-
-            if (ch == 13) break;
-            if (ch == 224) {
+            if (ch == 0xE0) {
                 ch = _getch();
-                switch (ch) {
-                    case 75: if (width > 1) { --width; changed = true; } break;
-                    case 77: if (width < 15) { ++width; changed = true; } break;
+                switch(ch) {
+                    case 75: if(width > 1) { --width; changed = true; } break;
+                    case 77: if(width < 15) { ++width; changed = true; } break;
                 }
             }
-        }
-
-        usleep(10000);
+            else if (ch == '\r') break;
 #else
         if ((ch = getchar()) != EOF) {
-#endif
             if (ch == '\n') break;
-            if (ch == 27) {
+            if (ch == '\033') {
                 getchar();
-                switch (getchar()) {
-                    case 'D': if (width > 1) { --width; changed = true; } break;
-                    case 'C': if (width < 15) { ++width; changed = true; } break;
+                switch(getchar()) {
+                    case 'D': if(width > 1) { --width; changed = true; } break;
+                    case 'C': if(width < 15) { ++width; changed = true; } break;
                 }
             }
+#endif
         }
-
         usleep(10000);
     }
 
@@ -181,8 +170,7 @@ float get_char_aspect_ratio() {
     fcntl(STDIN_FILENO, F_SETFL, oldf);
 #endif
 
-    aspect_ratio = (float)height / (width + 1);
-    return aspect_ratio;
+    return (float)height / width;
 }
 
 void set_bit(uint8_t x, uint8_t y, bool value) {
