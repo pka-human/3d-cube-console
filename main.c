@@ -73,14 +73,12 @@ void get_terminal_size(unsigned *rows, unsigned *cols) {
 
 void clear_terminal() {
 #ifdef _WIN32
-    CONSOLE_SCREEN_BUFFER_INFO csbi; COORD screen_coords = { 0, 0 }; DWORD chars_written, console_size; HANDLE h_console;
-    h_console = GetStdHandle(STD_OUTPUT_HANDLE);
-    GetConsoleScreenBufferInfo(h_console, &csbi);
-    console_size = csbi.dwSize.X * csbi.dwSize.Y;
-    FillConsoleOutputCharacter(h_console, (TCHAR)' ', console_size, screen_coords, &chars_written);
-    GetConsoleScreenBufferInfo(h_console, &csbi);
-    FillConsoleOutputAttribute(h_console, csbi.wAttributes, console_size, screen_coords, &chars_written);
-    SetConsoleCursorPosition(h_console, screen_coords);
+    HANDLE hOut;
+    COORD Position;
+    hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    Position.X = 0;
+    Position.Y = 0;
+    SetConsoleCursorPosition(hOut, Position);
 #else
     printf("\033[2J");
     printf("\033[H");
@@ -94,23 +92,27 @@ float get_char_aspect_ratio() {
     int ch;
     bool changed = true;
 
-#ifdef _WIN32
-    HANDLE hStdin = GetStdHandle(STD_INPUT_HANDLE);
-    DWORD mode;
-    GetConsoleMode(hStdin, &mode);
-    SetConsoleMode(hStdin, mode & ~(ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT));
-#else
-    struct termios oldt, newt;
-    tcgetattr(STDIN_FILENO, &oldt);
-    newt = oldt;
-    newt.c_lflag &= ~(ICANON | ECHO);
-    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
-    fcntl(STDIN_FILENO, F_SETFL, fcntl(STDIN_FILENO, F_GETFL) | O_NONBLOCK);
-#endif
+    #ifdef _WIN32
+        HANDLE hStdin = GetStdHandle(STD_INPUT_HANDLE);
+        DWORD mode;
+        GetConsoleMode(hStdin, &mode);
+        SetConsoleMode(hStdin, mode & ~(ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT));
+    #else
+        struct termios oldt, newt;
+        tcgetattr(STDIN_FILENO, &oldt);
+        newt = oldt;
+        newt.c_lflag &= ~(ICANON | ECHO);
+        tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+        fcntl(STDIN_FILENO, F_SETFL, fcntl(STDIN_FILENO, F_GETFL) | O_NONBLOCK);
+    #endif
 
     while (1) {
         if (changed) {
-            clear_terminal();
+            #ifdef _WIN32
+                system("cls");
+            #else
+                clear_terminal();
+            #endif
             printf("Use left/right arrow keys to adjust\nthe width until it looks like a square.\nPress Enter when it's right.\n\n");
 
             for (unsigned i = 0; i < height; ++i) {
@@ -122,38 +124,39 @@ float get_char_aspect_ratio() {
             changed = false;
         }
 
-#ifdef _WIN32
-        if (_kbhit()) {
-            ch = _getch();
-            if (ch == 0xE0 || ch == 0x00) {
-                ch = _getch();
-                switch(ch) {
-                    case 75: if(width > 1) { --width; changed = true; } break;
-                    case 77: if(width < 15) { ++width; changed = true; } break;
+            #ifdef _WIN32
+                if (_kbhit()) {
+                    ch = _getch();
+                    if (ch == 0xE0 || ch == 0x00) {
+                        ch = _getch();
+                        switch(ch) {
+                            case 75: if(width > 1) { --width; changed = true; } break;
+                            case 77: if(width < 15) { ++width; changed = true; } break;
+                        }
+                    }
+                    else if (ch == '\r') break;
                 }
-            }
-            else if (ch == '\r') break;
-#else
-        if ((ch = getchar()) != EOF) {
-            if (ch == '\n') break;
-            if (ch == '\033') {
-                getchar();
-                switch(getchar()) {
-                    case 'D': if(width > 1) { --width; changed = true; } break;
-                    case 'C': if(width < 15) { ++width; changed = true; } break;
+            #else
+                if ((ch = getchar()) != EOF) {
+                    if (ch == '\n') break;
+                    if (ch == '\033') {
+                        getchar();
+                        switch(getchar()) {
+                            case 'D': if(width > 1) { --width; changed = true; } break;
+                            case 'C': if(width < 15) { ++width; changed = true; } break;
+                        }
+                    }
                 }
-            }
-#endif
+            #endif
         }
         usleep(10000);
-    }
 
-#ifdef _WIN32
-    SetConsoleMode(hStdin, mode);
-#else
-    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
-#endif
-
+    #ifdef _WIN32
+        SetConsoleMode(hStdin, mode);
+        system("cls");
+    #else
+        tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+    #endif
     return (float)height / width;
 }
 
@@ -402,6 +405,16 @@ void draw() {
             line_buf[pos++] = get_bit(xp, yp) ? '@' : ' ';
         }
         line_buf[pos++] = '|';
+        
+        #ifdef _WIN32
+            unsigned rows, cols;
+            get_terminal_size(&rows, &cols);
+
+            for (unsigned i = 1; i <= cols - screen_x - 3; ++i) {
+                line_buf[pos++] = '.';
+            }
+        #endif
+
         line_buf[pos++] = '\n';
         line_buf[pos] = '\0';
         printf("%s", line_buf);
