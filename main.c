@@ -73,27 +73,14 @@ void get_terminal_size(unsigned *rows, unsigned *cols) {
 
 void clear_terminal() {
 #ifdef _WIN32
-    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-    COORD coordScreen = { 0, 0 };
-    DWORD cCharsWritten;
-    CONSOLE_SCREEN_BUFFER_INFO csbi;
-    DWORD dwConSize;
-
-    if (!GetConsoleScreenBufferInfo(hConsole, &csbi)) {
-        return;
-    }
-
-    dwConSize = csbi.dwSize.X * csbi.dwSize.Y;
-
-    if (!FillConsoleOutputCharacter(hConsole, (TCHAR)' ', dwConSize, coordScreen, &cCharsWritten)) {
-        return;
-    }
-
-    if (!FillConsoleOutputAttribute(hConsole, csbi.wAttributes, dwConSize, coordScreen, &cCharsWritten)) {
-        return;
-    }
-
-    SetConsoleCursorPosition(hConsole, coordScreen);
+    CONSOLE_SCREEN_BUFFER_INFO csbi; COORD screen_coords = { 0, 0 }; DWORD chars_written, console_size; HANDLE h_console;
+    h_console = GetStdHandle(STD_OUTPUT_HANDLE);
+    GetConsoleScreenBufferInfo(h_console, &csbi);
+    console_size = csbi.dwSize.X * csbi.dwSize.Y;
+    FillConsoleOutputCharacter(h_console, (TCHAR)' ', console_size, screen_coords, &chars_written);
+    GetConsoleScreenBufferInfo(h_console, &csbi);
+    FillConsoleOutputAttribute(h_console, csbi.wAttributes, console_size, screen_coords, &chars_written);
+    SetConsoleCursorPosition(h_console, screen_coords);
 #else
     printf("\033[2J");
     printf("\033[H");
