@@ -71,19 +71,40 @@ void get_terminal_size(unsigned *rows, unsigned *cols) {
 #endif
 }
 
-void clear_terminal(int blanks) {
-    if (blanks > 0) {
-        for (unsigned i = 1; i <= blanks; ++i) {
-            putchar('\n');
-        }
+void clear_terminal() {
+#ifdef _WIN32
+    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+    COORD coordScreen = { 0, 0 };
+    DWORD cCharsWritten;
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    DWORD dwConSize;
+
+    if (!GetConsoleScreenBufferInfo(hConsole, &csbi)) {
+        return;
     }
+
+    dwConSize = csbi.dwSize.X * csbi.dwSize.Y;
+
+    if (!FillConsoleOutputCharacter(hConsole, (TCHAR)' ', dwConSize, coordScreen, &cCharsWritten)) {
+        return;
+    }
+
+    if (!FillConsoleOutputAttribute(hConsole, csbi.wAttributes, dwConSize, coordScreen, &cCharsWritten)) {
+        return;
+    }
+
+    SetConsoleCursorPosition(hConsole, coordScreen);
+#else
+    printf("\033[2J");
+    printf("\033[H");
+#endif
 }
 
 float get_char_aspect_ratio() {
     unsigned height = 5;
     unsigned width = height;
     float aspect_ratio = 1.0;
-    char ch;
+    int ch;
     bool changed = true;
 
 #ifdef _WIN32
@@ -105,6 +126,7 @@ float get_char_aspect_ratio() {
 
     while (1) {
         if (changed) {
+            clear_terminal();
             printf("Use left/right arrow keys to adjust\nthe width until it looks like a square.\nPress Enter when it's right.\n\n");
 
             for (unsigned i = 0; i < height; ++i) {
@@ -118,18 +140,24 @@ float get_char_aspect_ratio() {
                 putchar('\n');
             }
 
-            unsigned rows, cols;
-            get_terminal_size(&rows, &cols);
-            int blanks = rows - height - 5;
-
-            clear_terminal(blanks);
-
             changed = false;
         }
 
 #ifdef _WIN32
         if (_kbhit()) {
             ch = _getch();
+
+            if (ch == 13) break;
+            if (ch == 224) {
+                ch = _getch();
+                switch (ch) {
+                    case 75: if (width > 1) { --width; changed = true; } break;
+                    case 77: if (width < 15) { ++width; changed = true; } break;
+                }
+            }
+        }
+
+        usleep(10000);
 #else
         if ((ch = getchar()) != EOF) {
 #endif
@@ -199,7 +227,11 @@ bool update_screen_size() {
         previous_rows = rows;
 
         if (rows <= 255) {
-            screen_y = rows - 3;
+            if (rows < 3) {
+                screen_y = 0;
+            } else {
+                screen_y = rows - 3;
+            }
         } else {
             screen_y = 255;
         }
@@ -403,11 +435,7 @@ void draw() {
         printf("%s", line_buf);
     }
 
-    // unsigned rows, cols;
-    // get_terminal_size(&rows, &cols);
-    // int blanks = rows - screen_y;
-
-    // clear_terminal(blanks);
+    // clear_terminal();
 }
 
 void cube(const int8_t s) {
