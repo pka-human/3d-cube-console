@@ -6,14 +6,10 @@
 #include <time.h>
 #include <math.h>
 #include <string.h>
+#include <termios.h>
+#include <fcntl.h>
 
-#define PIXEL_ASPECT (9.0f / 20.0f)
-
-long long get_microseconds() {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return ts.tv_sec * 1000000LL + ts.tv_nsec / 1000;
-}
+#define CLEAR_TERMINAL "\033[2J\033[H"
 
 typedef struct {
     uint8_t x, y;
@@ -34,6 +30,62 @@ size_t drawings_size = 0;
 uint8_t* screen = NULL;
 uint8_t screen_x;
 uint8_t screen_y;
+
+long long get_microseconds() {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts.tv_sec * 1000000LL + ts.tv_nsec / 1000;
+}
+
+float get_char_aspect_ratio() {
+    unsigned width = 5;
+    unsigned height = width;
+    float aspect_ratio = 1.0;
+    char ch;
+    struct termios oldt, newt;
+    int oldf;
+
+    tcgetattr(STDIN_FILENO, &oldt);
+    newt = oldt;
+    newt.c_lflag &= ~(ICANON | ECHO);
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+    oldf = fcntl(STDIN_FILENO, F_GETFL, 0);
+    fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);
+
+    while (1) {
+        printf("\033[2J\033[H");
+        printf("Use left/right arrow keys to adjust\nthe width until it looks like a square.\nPress Enter when it's right.\n\n");
+
+        for (unsigned i = 0; i < height; ++i) {
+            for (unsigned j = 0; j < width; ++j) {
+                if (i == 0 || i == height - 1 || j == 0 || j == width - 1) {
+                    putchar('@');
+                } else {
+                    putchar(' ');
+                }
+            }
+            putchar('\n');
+        }
+
+        if ((ch = getchar()) != EOF) {
+            if (ch == '\n') break;
+            if (ch == 27) {
+                getchar();
+                switch (getchar()) {
+                    case 'D': if (width > 1) width--; break;
+                    case 'C': width++; break;
+                }
+            }
+        }
+        usleep(10000);
+    }
+
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+    fcntl(STDIN_FILENO, F_SETFL, oldf);
+
+    aspect_ratio = (float)height / (width + 1);
+    return aspect_ratio;
+}
 
 void set_bit(uint8_t x, uint8_t y, bool value) {
     uint16_t pos = y * screen_x + x;
@@ -275,6 +327,8 @@ void cube(const int8_t s) {
 }
 
 int main() {
+
+    float PIXEL_ASPECT = get_char_aspect_ratio();
 
     screen_y = 45;
     screen_x = (unsigned)round(screen_y / PIXEL_ASPECT);
