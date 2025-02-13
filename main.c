@@ -397,7 +397,7 @@ void draw() {
         draw_line2d(draw_point_a, draw_point_b);
     }
 
-    char line_buf[screen_x + 3]; 
+    char line_buf[256]; 
 
     for (uint8_t yp = 0; yp < screen_y; ++yp) {
         size_t pos = 0;
@@ -410,7 +410,7 @@ void draw() {
             unsigned rows, cols;
             get_terminal_size(&rows, &cols);
 
-            for (unsigned i = 1; i <= cols - screen_x - 3; ++i) {
+            for (int i = 1; i <= cols - screen_x - 3; ++i) {
                 line_buf[pos++] = '.';
             }
         #endif
