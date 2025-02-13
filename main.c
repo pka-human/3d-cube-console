@@ -32,11 +32,17 @@ uint8_t screen_x;
 uint8_t screen_y;
 
 long long get_microseconds() {
+#ifdef _WIN32
+    LARGE_INTEGER freq, time;
+    QueryPerformanceFrequency(&freq);
+    QueryPerformanceCounter(&time);
+    return (time.QuadPart * 1000000LL) / freq.QuadPart;
+#else
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return ts.tv_sec * 1000000LL + ts.tv_nsec / 1000;
+#endif
 }
-
 float get_char_aspect_ratio() {
     unsigned width = 5;
     unsigned height = width;
@@ -61,7 +67,7 @@ float get_char_aspect_ratio() {
                 if (i == 0 || i == height - 1 || j == 0 || j == width - 1) {
                     putchar('@');
                 } else {
-                    putchar(' ');
+                    putchar('.');
                 }
             }
             putchar('\n');
