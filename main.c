@@ -6,10 +6,15 @@
 #include <time.h>
 #include <math.h>
 #include <string.h>
+
+#ifdef _WIN32
+#include <windows.h>
+#include <conio.h>
+#else
+#include <sys/ioctl.h>
 #include <termios.h>
 #include <fcntl.h>
-
-#define CLEAR_TERMINAL "\033[2J\033[H"
+#endif
 
 typedef struct {
     uint8_t x, y;
@@ -31,6 +36,10 @@ uint8_t* screen = NULL;
 uint8_t screen_x;
 uint8_t screen_y;
 
+float PIXEL_ASPECT = 1.0f;
+
+unsigned previous_rows;
+
 long long get_microseconds() {
 #ifdef _WIN32
     LARGE_INTEGER freq, time;
@@ -43,11 +52,46 @@ long long get_microseconds() {
     return ts.tv_sec * 1000000LL + ts.tv_nsec / 1000;
 #endif
 }
+
+void get_terminal_size(unsigned *rows, unsigned *cols) {
+#ifdef _WIN32
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
+    *rows = csbi.srWindow.Bottom - csbi.srWindow.Top + 1;
+    *cols = csbi.srWindow.Right - csbi.srWindow.Left + 1;
+#else
+    struct winsize w;
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == -1) {
+        *rows = 0;
+        *cols = 0;
+    } else {
+        *rows = w.ws_row;
+        *cols = w.ws_col;
+    }
+#endif
+}
+
+void clear_terminal(int blanks) {
+    if (blanks > 0) {
+        for (unsigned i = 1; i <= blanks; ++i) {
+            putchar('\n');
+        }
+    }
+}
+
 float get_char_aspect_ratio() {
-    unsigned width = 5;
-    unsigned height = width;
+    unsigned height = 5;
+    unsigned width = height;
     float aspect_ratio = 1.0;
     char ch;
+    bool changed = true;
+
+#ifdef _WIN32
+    HANDLE hStdin = GetStdHandle(STD_INPUT_HANDLE);
+    DWORD mode;
+    GetConsoleMode(hStdin, &mode);
+    SetConsoleMode(hStdin, mode & ~(ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT));
+#else
     struct termios oldt, newt;
     int oldf;
 
@@ -57,37 +101,57 @@ float get_char_aspect_ratio() {
     tcsetattr(STDIN_FILENO, TCSANOW, &newt);
     oldf = fcntl(STDIN_FILENO, F_GETFL, 0);
     fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);
+#endif
 
     while (1) {
-        printf("\033[2J\033[H");
-        printf("Use left/right arrow keys to adjust\nthe width until it looks like a square.\nPress Enter when it's right.\n\n");
+        if (changed) {
+            printf("Use left/right arrow keys to adjust\nthe width until it looks like a square.\nPress Enter when it's right.\n\n");
 
-        for (unsigned i = 0; i < height; ++i) {
-            for (unsigned j = 0; j < width; ++j) {
-                if (i == 0 || i == height - 1 || j == 0 || j == width - 1) {
-                    putchar('@');
-                } else {
-                    putchar('.');
+            for (unsigned i = 0; i < height; ++i) {
+                for (unsigned j = 0; j < width; ++j) {
+                    if (i == 0 || i == height - 1 || j == 0 || j == width - 1) {
+                        putchar('@');
+                    } else {
+                        putchar('.');
+                    }
                 }
+                putchar('\n');
             }
-            putchar('\n');
+
+            unsigned rows, cols;
+            get_terminal_size(&rows, &cols);
+            int blanks = rows - height - 5;
+
+            clear_terminal(blanks);
+
+            changed = false;
         }
 
+#ifdef _WIN32
+        if (_kbhit()) {
+            ch = _getch();
+#else
         if ((ch = getchar()) != EOF) {
+#endif
             if (ch == '\n') break;
             if (ch == 27) {
                 getchar();
                 switch (getchar()) {
-                    case 'D': if (width > 1) width--; break;
-                    case 'C': width++; break;
+                    case 'D': if (width > 1) { --width; changed = true; } break;
+                    case 'C': if (width < 15) { ++width; changed = true; } break;
                 }
             }
         }
+
         usleep(10000);
     }
 
+#ifdef _WIN32
+    SetConsoleMode(hStdin, mode);
+#else
     tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
     fcntl(STDIN_FILENO, F_SETFL, oldf);
+#endif
 
     aspect_ratio = (float)height / (width + 1);
     return aspect_ratio;
@@ -121,13 +185,39 @@ void init_screen() {
     }
 }
 
+void reinit_screen() {
+    free(screen);
+    screen = NULL;
+    init_screen();
+}
+
+bool update_screen_size() {
+    unsigned rows, cols;
+    get_terminal_size(&rows, &cols);
+
+    if (rows != previous_rows) {
+        previous_rows = rows;
+
+        if (rows <= 255) {
+            screen_y = rows - 3;
+        } else {
+            screen_y = 255;
+        }
+
+        screen_x = (unsigned)round(screen_y / PIXEL_ASPECT);
+
+        return true;
+    } else {
+        return false;
+    }
+}
+
 void free_all() {
     free(drawings);
     free(drawings_buffer);
-    free(screen);
     drawings = NULL;
     drawings_buffer = NULL;
-    screen = NULL;
+    drawings_size = 0;
 }
 
 void clear_screen() {
@@ -249,8 +339,7 @@ Vector3 rotate_vector3d(Vector3 vec, float angleX, float angleY, float angleZ) {
 }
 
 void rotate_world(float thetaX, float thetaY, float thetaZ) {
-    for (size_t i = 0; i < drawings_size; i++) {
-
+    for (size_t i = 0; i < drawings_size; ++i) {
         drawings[i].a = rotate_vector3d(drawings[i].a, thetaX, thetaY, thetaZ);
         drawings[i].b = rotate_vector3d(drawings[i].b, thetaX, thetaY, thetaZ);
     }
@@ -294,20 +383,18 @@ void draw_line2d(Vector2 point_a, Vector2 point_b) {
 
 void draw() {
     clear_screen();
-    for (size_t i = 0; i < drawings_size; i++) {
+    for (size_t i = 0; i < drawings_size; ++i) {
         drawing d = drawings[i];
         Vector2 draw_point_a = project3d2d(true, d.a, 60, 0.8);
         Vector2 draw_point_b = project3d2d(true, d.b, 60, 0.8);
         draw_line2d(draw_point_a, draw_point_b);
     }
 
-    printf("\033[H\033[2J"); // Clear console
-
     char line_buf[screen_x + 3]; 
 
-    for (uint8_t yp = 0; yp < screen_y; yp++) {
+    for (uint8_t yp = 0; yp < screen_y; ++yp) {
         size_t pos = 0;
-        for (uint8_t xp = 0; xp < screen_x; xp++) {
+        for (uint8_t xp = 0; xp < screen_x; ++xp) {
             line_buf[pos++] = get_bit(xp, yp) ? '@' : ' ';
         }
         line_buf[pos++] = '|';
@@ -315,6 +402,12 @@ void draw() {
         line_buf[pos] = '\0';
         printf("%s", line_buf);
     }
+
+    // unsigned rows, cols;
+    // get_terminal_size(&rows, &cols);
+    // int blanks = rows - screen_y;
+
+    // clear_terminal(blanks);
 }
 
 void cube(const int8_t s) {
@@ -333,12 +426,9 @@ void cube(const int8_t s) {
 }
 
 int main() {
+    PIXEL_ASPECT = get_char_aspect_ratio();
 
-    float PIXEL_ASPECT = get_char_aspect_ratio();
-
-    screen_y = 45;
-    screen_x = (unsigned)round(screen_y / PIXEL_ASPECT);
-
+    update_screen_size();
     init_screen();
 
     float rotationX = 0;
@@ -361,6 +451,11 @@ int main() {
 
         rotate_world(rotationX, rotationY, rotationZ);
 
+        if (update_screen_size()) {
+            reinit_screen();
+        }
+
+        printf("3D Cube in console. (Ctrl + C to quit)\nWritten in C by pka_human, 2025.\n");
         draw();
 
         rotationX += 0.01f;
