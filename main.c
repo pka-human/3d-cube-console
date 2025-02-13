@@ -397,28 +397,17 @@ void draw() {
         draw_line2d(draw_point_a, draw_point_b);
     }
 
-    char line_buf[screen_x + 1]; 
+    char line_buf[screen_x + 3]; 
 
     for (uint8_t yp = 0; yp < screen_y; ++yp) {
         size_t pos = 0;
         for (uint8_t xp = 0; xp < screen_x; ++xp) {
             line_buf[pos++] = get_bit(xp, yp) ? '@' : ' ';
         }
-        
+        line_buf[pos++] = '|';
+        line_buf[pos++] = '\n';
         line_buf[pos] = '\0';
         printf("%s", line_buf);
-
-        putchar('|');
-
-        #ifdef _WIN32
-            unsigned rows, cols;
-            get_terminal_size(&rows, &cols);
-
-            for (unsigned i = 1; i <= cols - screen_x - 1; ++i) {
-                putchar('.');
-            }
-        #endif
-        putchar('\n');
     }
 }
 
@@ -465,6 +454,9 @@ int main() {
 
         if (update_screen_size()) {
             reinit_screen();
+            #ifdef _WIN32
+                system("cls");
+            #endif
         }
 
         clear_terminal();
