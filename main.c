@@ -91,7 +91,7 @@ float get_char_aspect_ratio() {
     unsigned height = 5;
     unsigned width = height;
     float aspect_ratio = 1.0;
-    unsigned char ch;
+    int ch;
     bool changed = true;
 
 #ifdef _WIN32
@@ -406,8 +406,6 @@ void draw() {
         line_buf[pos] = '\0';
         printf("%s", line_buf);
     }
-
-    // clear_terminal();
 }
 
 void cube(const int8_t s) {
@@ -455,6 +453,7 @@ int main() {
             reinit_screen();
         }
 
+        clear_terminal();
         printf("3D Cube in console. (Ctrl + C to quit)\nWritten in C by pka_human, 2025.\n");
         draw();
 
