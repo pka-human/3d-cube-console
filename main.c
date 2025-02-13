@@ -104,7 +104,7 @@ float get_char_aspect_ratio() {
     unsigned height = 5;
     unsigned width = height;
     float aspect_ratio = 1.0;
-    char ch;
+    unsigned char ch;
     bool changed = true;
 
 #ifdef _WIN32
@@ -114,13 +114,11 @@ float get_char_aspect_ratio() {
     SetConsoleMode(hStdin, mode & ~(ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT));
 #else
     struct termios oldt, newt;
-    int oldf;
     tcgetattr(STDIN_FILENO, &oldt);
     newt = oldt;
     newt.c_lflag &= ~(ICANON | ECHO);
     tcsetattr(STDIN_FILENO, TCSANOW, &newt);
-    oldf = fcntl(STDIN_FILENO, F_GETFL, 0);
-    fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);
+    fcntl(STDIN_FILENO, F_SETFL, fcntl(STDIN_FILENO, F_GETFL) | O_NONBLOCK);
 #endif
 
     while (1) {
@@ -140,7 +138,7 @@ float get_char_aspect_ratio() {
 #ifdef _WIN32
         if (_kbhit()) {
             ch = _getch();
-            if (ch == 0xE0) {
+            if (ch == 0xE0 || ch == 0x00) {
                 ch = _getch();
                 switch(ch) {
                     case 75: if(width > 1) { --width; changed = true; } break;
@@ -167,7 +165,6 @@ float get_char_aspect_ratio() {
     SetConsoleMode(hStdin, mode);
 #else
     tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
-    fcntl(STDIN_FILENO, F_SETFL, oldf);
 #endif
 
     return (float)height / width;
