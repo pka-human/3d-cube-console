@@ -138,7 +138,7 @@ float get_char_aspect_ratio() {
                 }
             #else
                 if ((ch = getchar()) != EOF) {
-                    if (ch == '\n') break;
+                    if (ch == '\n' || ch == '\r') break;
                     if (ch == '\033') {
                         getchar();
                         switch(getchar()) {
