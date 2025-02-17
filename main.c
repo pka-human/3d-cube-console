@@ -39,6 +39,7 @@ uint8_t screen_y;
 float PIXEL_ASPECT = 1.0f;
 
 unsigned previous_rows;
+unsigned previous_cols;
 
 long long get_microseconds() {
 #ifdef _WIN32
@@ -130,8 +131,8 @@ float get_char_aspect_ratio() {
                     if (ch == 0xE0 || ch == 0x00) {
                         ch = _getch();
                         switch(ch) {
-                            case 75: if(width > 1) { --width; changed = true; } break;
-                            case 77: if(width < 15) { ++width; changed = true; } break;
+                            case 'K': if(width > height) { --width; changed = true; } break;
+                            case 'M': if(width < 15) { ++width; changed = true; } break;
                         }
                     }
                     else if (ch == '\r') break;
@@ -142,7 +143,7 @@ float get_char_aspect_ratio() {
                     if (ch == '\033') {
                         getchar();
                         switch(getchar()) {
-                            case 'D': if(width > 1) { --width; changed = true; } break;
+                            case 'D': if(width > height) { --width; changed = true; } break;
                             case 'C': if(width < 15) { ++width; changed = true; } break;
                         }
                     }
@@ -194,29 +195,48 @@ void reinit_screen() {
     init_screen();
 }
 
-bool update_screen_size() {
-    unsigned rows, cols;
-    get_terminal_size(&rows, &cols);
+void calculate_screen_size(unsigned terminal_rows, unsigned terminal_cols) {
+    if (terminal_rows == 0 || terminal_cols == 0) {
+        screen_x = 0;
+        screen_y = 0;
+        return;
+    }
 
-    if (rows != previous_rows) {
-        previous_rows = rows;
+    if (terminal_rows * PIXEL_ASPECT > 255 && terminal_cols > 255) {
+        screen_x = 255;
+        screen_y = (uint8_t)round(255 * PIXEL_ASPECT);
+        return;
+    }
 
-        if (rows <= 255) {
-            if (rows < 3) {
-                screen_y = 0;
-            } else {
-                screen_y = rows - 3;
-            }
-        } else {
-            screen_y = 255;
-        }
-
-        screen_x = (unsigned)round(screen_y / PIXEL_ASPECT);
-
-        return true;
+    if (terminal_rows < 4) {
+        screen_y = 0;
     } else {
+        screen_y = terminal_rows - 3;
+    }
+
+    screen_x = (uint8_t)round(screen_y / PIXEL_ASPECT);
+
+    if (screen_x >= terminal_cols) {
+        screen_x = terminal_cols - 1;
+        screen_y = (uint8_t)round(screen_x * PIXEL_ASPECT);
+    }
+}
+
+bool update_screen_size() {
+    unsigned terminal_rows, terminal_cols;
+
+    get_terminal_size(&terminal_rows, &terminal_cols);
+
+    if (terminal_rows == previous_rows && terminal_cols == previous_cols) {
         return false;
     }
+
+    previous_rows = terminal_rows;
+    previous_cols = terminal_cols;
+
+    calculate_screen_size(terminal_rows, terminal_cols);
+
+    return true;
 }
 
 void free_all() {
@@ -390,6 +410,18 @@ void draw_line2d(Vector2 point_a, Vector2 point_b) {
 
 void draw() {
     clear_screen();
+
+    if (screen_x == 0 || screen_y == 0) {
+        return;
+    }
+
+    if (previous_cols <= 38 || previous_rows <= 15) {
+        printf("Too small :(\n");
+        return;
+    }
+
+    printf("3D Cube in console. (Ctrl + C to quit)\nWritten in C by pka_human, 2025.\n");
+
     for (size_t i = 0; i < drawings_size; ++i) {
         drawing d = drawings[i];
         Vector2 draw_point_a = project3d2d(true, d.a, 60, 0.8);
@@ -460,7 +492,6 @@ int main() {
         }
 
         clear_terminal();
-        printf("3D Cube in console. (Ctrl + C to quit)\nWritten in C by pka_human, 2025.\n");
         draw();
 
         rotationX += 0.01f;
