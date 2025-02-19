@@ -464,15 +464,13 @@ int main() {
     update_screen_size();
     init_screen();
 
+    long long previous_time;
+
     float rotationX = 0;
     float rotationY = 0;
     float rotationZ = 0;
 
-    const int8_t s = 50;
-
-    long long previous_time;
-
-    cube(s);
+    cube(50); // cube, size 50.
 
     allocate_drawings();
 
