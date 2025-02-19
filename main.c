@@ -125,32 +125,32 @@ float get_char_aspect_ratio() {
             changed = false;
         }
 
-            #ifdef _WIN32
-                if (_kbhit()) {
+        #ifdef _WIN32
+            if (_kbhit()) {
+                ch = _getch();
+                if (ch == 0xE0 || ch == 0x00) {
                     ch = _getch();
-                    if (ch == 0xE0 || ch == 0x00) {
-                        ch = _getch();
-                        switch(ch) {
-                            case 'K': if(width > height) { --width; changed = true; } break;
-                            case 'M': if(width < 15) { ++width; changed = true; } break;
-                        }
-                    }
-                    else if (ch == '\r') break;
-                }
-            #else
-                if ((ch = getchar()) != EOF) {
-                    if (ch == '\n' || ch == '\r') break;
-                    if (ch == '\033') {
-                        getchar();
-                        switch(getchar()) {
-                            case 'D': if(width > height) { --width; changed = true; } break;
-                            case 'C': if(width < 15) { ++width; changed = true; } break;
-                        }
+                    switch(ch) {
+                        case 'K': if(width > height) { --width; changed = true; } break;
+                        case 'M': if(width < 15) { ++width; changed = true; } break;
                     }
                 }
-            #endif
-        }
+                else if (ch == '\r') break;
+            }
+        #else
+            if ((ch = getchar()) != EOF) {
+                if (ch == '\n' || ch == '\r') break;
+                if (ch == '\033') {
+                    getchar();
+                    switch(getchar()) {
+                        case 'D': if(width > height) { --width; changed = true; } break;
+                        case 'C': if(width < 15) { ++width; changed = true; } break;
+                    }
+                }
+            }
+        #endif
         usleep(10000);
+    }
 
     #ifdef _WIN32
         SetConsoleMode(hStdin, mode);
