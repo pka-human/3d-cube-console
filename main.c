@@ -36,7 +36,7 @@ uint8_t* screen = NULL;
 uint8_t screen_x;
 uint8_t screen_y;
 
-float PIXEL_ASPECT;
+float PIXEL_ASPECT = 1;
 
 unsigned previous_rows;
 unsigned previous_cols;
