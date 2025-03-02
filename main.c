@@ -32,7 +32,7 @@ drawing *drawings = NULL;
 drawing *drawings_buffer = NULL;
 size_t drawings_size = 0;
 
-uint8_t* screen = NULL;
+uint8_t *screen = NULL;
 uint8_t screen_x;
 uint8_t screen_y;
 
@@ -81,8 +81,7 @@ void clear_terminal() {
     Position.Y = 0;
     SetConsoleCursorPosition(hOut, Position);
 #else
-    printf("\033[2J");
-    printf("\033[H");
+    printf("\033[2J\033[H");
 #endif
 }
 
