@@ -193,49 +193,8 @@ void reinit_screen() {
     init_screen();
 }
 
-void calculate_screen_size(unsigned terminal_rows, unsigned terminal_cols) {
-  if (terminal_rows == 0 || terminal_cols == 0) {
-    screen_x = 0;
-    screen_y = 0;
-    return;
-  }
-
-  unsigned max_y = terminal_rows < 4 ? 0 : fmin(terminal_rows - 3, 255.0);
-  unsigned max_x = fmin(terminal_cols - 1, 255.0);
-
-  unsigned potential_x = round(max_y / PIXEL_ASPECT);
-  unsigned potential_y = round(max_x * PIXEL_ASPECT);
-
-  if (potential_x <= max_x && potential_y <= max_y)
-   {
-    screen_x = (uint8_t) potential_x;
-    screen_y = (uint8_t) potential_y;
-   } 
-  else if (potential_x <= max_x)
-   {
-      screen_x = (uint8_t) potential_x;
-      screen_y = (uint8_t) fmin(round(screen_x * PIXEL_ASPECT), max_y);
-   }
-  else if(potential_y <= max_y)
-  {
-    screen_y = (uint8_t) potential_y;
-    screen_x = (uint8_t) fmin(round(screen_y / PIXEL_ASPECT), max_x);
-  }
-  else 
-   {
-        if (potential_x > max_x) {
-            screen_x = (uint8_t)max_x;
-            screen_y = (uint8_t)fmin(round(screen_x * PIXEL_ASPECT), max_y);
-        } else {
-            screen_y = (uint8_t)max_y;
-            screen_x = (uint8_t)fmin(round(screen_y / PIXEL_ASPECT), max_x);
-        }
-    }
-}
-
 bool update_screen_size() {
     unsigned terminal_rows, terminal_cols;
-
     get_terminal_size(&terminal_rows, &terminal_cols);
 
     if (terminal_rows == previous_rows && terminal_cols == previous_cols) {
@@ -245,7 +204,28 @@ bool update_screen_size() {
     previous_rows = terminal_rows;
     previous_cols = terminal_cols;
 
-    calculate_screen_size(terminal_rows, terminal_cols);
+    if (terminal_rows == 0 || terminal_cols == 0) {
+        screen_x = 0;
+        screen_y = 0;
+        return false;
+    }
+
+    unsigned max_y = (terminal_rows < 4) ? 0 : (terminal_rows - 3);
+    unsigned max_x = terminal_cols - 1;
+
+    unsigned potential_x = (unsigned) round(max_y / PIXEL_ASPECT);
+    unsigned potential_y = (unsigned) round(max_x * PIXEL_ASPECT);
+
+    if (potential_x <= max_x && potential_y <= max_y) {
+        screen_x = (uint8_t) potential_x;
+        screen_y = (uint8_t) potential_y;
+    } else if (potential_x <= max_x) {
+        screen_x = (uint8_t) potential_x;
+        screen_y = (uint8_t) fmin(round(screen_x * PIXEL_ASPECT), max_y);
+    } else {
+        screen_y = (uint8_t) fmin(round(max_x * PIXEL_ASPECT), max_y);
+        screen_x = (uint8_t) fmin(round(screen_y / PIXEL_ASPECT), max_x);
+    }
 
     return true;
 }
@@ -253,9 +233,7 @@ bool update_screen_size() {
 void free_all() {
     free(drawings);
     free(drawings_buffer);
-    drawings = NULL;
-    drawings_buffer = NULL;
-    drawings_size = 0;
+    free(screen);
 }
 
 void clear_screen() {
