@@ -1,7 +1,7 @@
 # 3d-cube-console
 3D cube in console, written in C.
 
-![gif](cube.gif)
+![animation](cube.gif)
 
 Compile with CLANG:
 ```bash
