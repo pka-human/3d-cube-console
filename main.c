@@ -241,21 +241,21 @@ void clear_screen() {
     memset(screen, 0, bytes);
 }
 
-void reallocate_drawings_buffer() {
-    drawings_buffer = (drawing*) realloc(drawings_buffer, (++drawings_size) * sizeof(drawing));
-    if (drawings_buffer == NULL) {
-        fprintf(stderr, "Error: Failed to reallocate memory for drawings_buffer!\n");
+void reallocate_drawings() {
+    drawings = (drawing*) realloc(drawings, (++drawings_size) * sizeof(drawing));
+    if (drawings == NULL) {
+        fprintf(stderr, "Error: Failed to reallocate memory for drawings!\n");
         exit(1);
     }
 }
 
-void allocate_drawings() {
-    if (drawings != NULL) {
+void allocate_drawings_buffer() {
+    if (drawings_buffer != NULL) {
         return;
     }
-    drawings = (drawing*) malloc(drawings_size * sizeof(drawing));
-    if (drawings == NULL) {
-        fprintf(stderr, "Error: Failed to allocate memory for drawings!\n");
+    drawings_buffer = (drawing*) malloc(drawings_size * sizeof(drawing));
+    if (drawings_buffer == NULL) {
+        fprintf(stderr, "Error: Failed to allocate memory for drawings buffer!\n");
         exit(1);
     }
 }
@@ -310,9 +310,9 @@ void line(Vector3 point_a, Vector3 point_b) {
         point_b.y >= -100 && point_b.y <= 100 &&
         point_b.z >= -100 && point_b.z <= 100) {
 
-        reallocate_drawings_buffer();
+        reallocate_drawings();
 
-        drawings_buffer[drawings_size - 1] = (drawing) {
+        drawings[drawings_size - 1] = (drawing) {
             .a = point_a,
             .b = point_b
         };
@@ -356,8 +356,8 @@ Vector3 rotate_vector3d(Vector3 vec, float angleX, float angleY, float angleZ) {
 
 void rotate_world(float thetaX, float thetaY, float thetaZ) {
     for (size_t i = 0; i < drawings_size; ++i) {
-        drawings[i].a = rotate_vector3d(drawings[i].a, thetaX, thetaY, thetaZ);
-        drawings[i].b = rotate_vector3d(drawings[i].b, thetaX, thetaY, thetaZ);
+        drawings_buffer[i].a = rotate_vector3d(drawings_buffer[i].a, thetaX, thetaY, thetaZ);
+        drawings_buffer[i].b = rotate_vector3d(drawings_buffer[i].b, thetaX, thetaY, thetaZ);
     }
 }
 
@@ -412,7 +412,7 @@ void draw() {
     printf("3D Cube in console. (Ctrl + C to quit)\nWritten in C by pka_human, 2025.\n");
 
     for (size_t i = 0; i < drawings_size; ++i) {
-        drawing d = drawings[i];
+        drawing d = drawings_buffer[i];
         Vector2 draw_point_a = project3d2d(true, d.a, 60, 0.8);
         Vector2 draw_point_b = project3d2d(true, d.b, 60, 0.8);
         draw_line2d(draw_point_a, draw_point_b);
@@ -461,13 +461,13 @@ int main() {
 
     cube(50); // cube, size 50.
 
-    allocate_drawings();
+    allocate_drawings_buffer();
 
     while (1) {
 
         previous_time = get_microseconds();
 
-        memcpy(drawings, drawings_buffer, drawings_size * sizeof(drawing));
+        memcpy(drawings_buffer, drawings, drawings_size * sizeof(drawing));
 
         rotate_world(rotationX, rotationY, rotationZ);
 
